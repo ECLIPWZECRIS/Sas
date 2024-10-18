@@ -1,4 +1,4 @@
-name: keep Alive codespace
+name: Auto Restart and Keep Codespace Active
 
 on:
   schedule:
@@ -33,7 +33,7 @@ jobs:
           echo "Codespace status: $STATUS"
 
           if [ "$STATUS" == "Shutdown" ]; then
-            echo "Codespace is offline. Attempting to start it..."
+            echo "Codespace is offline. Attempting to start it by SSH..."
             gh codespace ssh --codespace $CODESPACE_NAME -- echo 'Codespace started!'
           else
             echo "Codespace is active. Sending keep-alive signal..."
