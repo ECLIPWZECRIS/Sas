@@ -1,44 +1,42 @@
-name: Keep Codespaces Running
+name: keep Alive codespace
 
 on:
   schedule:
     - cron: '* * * * *'  # Runs every minute
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:
 
 jobs:
-  maintain_codespaces:
+  restart_codespace:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install GitHub CLI and jq
+      - name: Install GitHub CLI if not present
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gh jq
+          if ! command -v gh &> /dev/null; then
+            sudo apt-get install gh jq
+          fi
 
-      - name: Authenticate GitHub CLI with Personal Classic Token
-        env:
-          PERSONAL_CLASSIC_TOKEN: ${{ secrets.PERSONAL_CLASSIC_TOKEN }}  # Reference your secret
-        run: echo "$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" | gh auth login --with-token
-
-      - name: Check and Restart All Codespaces
+      - name: Authenticate GitHub CLI with Personal Access Token
         run: |
-          # Get the list of all Codespaces and their states
-          CODESPACES=$(gh codespace list --json name,state | jq -c '.[]')
+          echo "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" | gh auth login --with-token
 
-          # Iterate through each Codespace
-          echo "$CODESPACES" | while IFS= read -r codespace; do
-            NAME=$(echo "$codespace" | jq -r '.name')
-            STATUS=$(echo "$codespace" | jq -r '.state')
+      - name: Check Codespace Status and Keep Alive
+        run: |
+          CODESPACE_NAME="supreme-sniffle-wrr459qjjww735w6v"
+          STATUS=$(gh codespace list --json name,state | jq -r --arg name "$CODESPACE_NAME" '.[] | select(.name == $name) | .state')
 
-            echo "Codespace: $NAME, Status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "Error fetching codespace status or codespace does not exist."
+            exit 1
+          fi
 
-            if [ "$STATUS" == "Shutdown" ]; then
-              echo "Codespace $NAME is offline. Starting it..."
-              gh codespace ssh -c "$NAME" --exit-on-disconnect &
-            else
-              echo "Codespace $NAME is already running."
-            fi
-          done
+          echo "Codespace status: $STATUS"
 
-          # Wait for all background processes to complete
-          wait
+          if [ "$STATUS" == "Shutdown" ]; then
+            echo "Codespace is offline. Attempting to start it..."
+            gh codespace ssh --codespace $CODESPACE_NAME -- echo 'Codespace started!'
+          else
+            echo "Codespace is active. Sending keep-alive signal..."
+            gh codespace ssh --codespace $CODESPACE_NAME -- echo 'Keep-alive signal'
+          fi
+          
